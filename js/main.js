@@ -2,15 +2,70 @@ window.onload = function () {
 	// The functionality to be run when the when the page is loaded. 
 	var game = new MazeGame(30, 40);
 	game.render();
+	game.listen(window);
 }
 
 function MazeGame (r, c) {
+	var self = this;
 	var container = document.getElementById("maze");
 	var maze = new Maze(r, c);
 	maze.generate();
 
+	var player = maze.getStart();
+
 	var squareWidth = (100 / c) + "%";
 	var squareHeight = (100 / r) + "%";
+
+	this.listen = function (cont) {
+		cont.onkeydown = function (e) {
+			e = e || window.event; 
+		  var charCode = e.charCode || e.keyCode;
+		  switch (charCode) {
+		  	case 65: // a
+		  	case 37: // left
+		  		self.moveWest();
+		  		break;
+		  	case 87: // w
+		  	case 38: // up
+			  	self.moveNorth();
+		  		break;
+		  	case 68: // d
+		  	case 39: //right
+			  	self.moveEast();
+		  		break;
+		  	case 83: //s
+		  	case 40: // down
+		  		self.moveSouth();
+		  		break;
+		  }
+		}
+	}
+
+	this.move = function (newTile) {
+		if (newTile != null && !newTile.isWall()) {
+			if (player != null) {
+				document.getElementById(player.getId()).style.backgroundColor = "#fff";
+			}
+			player = newTile;
+			document.getElementById(player.getId()).style.backgroundColor = "red";
+		}
+	}
+
+	this.moveNorth = function () {
+		self.move(player.north());
+	}
+
+	this.moveEast = function () {
+		self.move(player.east());
+	}
+
+	this.moveSouth = function () {
+		self.move(player.south());
+	}
+
+	this.moveWest = function () {
+		self.move(player.west());
+	}
 
 	this.render = function () {
 		container.innerHTML = "";
@@ -19,6 +74,7 @@ function MazeGame (r, c) {
 				addSquare(i, j);
 			}
 		}
+		self.move(player);
 	}
 
 	function addSquare (r, c) {
@@ -30,7 +86,7 @@ function MazeGame (r, c) {
 			square.style.backgroundColor = "#fff";
 		}
 		square.setAttribute("class", "square");
-		square.setAttribute("id", r + "-" + c);
+		square.setAttribute("id", tile.getId());
 
 		container.appendChild(square);
 	}
@@ -60,7 +116,7 @@ function Maze (r, c) {
 	}
 
 	this.generate = function () {
-		var start = randomTile();
+		start = randomTile();
 		var stack = [start];
 		while (stack.length != 0) {
 			var current = stack.pop();
@@ -102,6 +158,10 @@ function Maze (r, c) {
 		var tile = new Tile();
 		var isWall = true;
 		var self = this;
+
+		this.getId = function () {
+			return row + "-" + column;
+		}
 
 		this.setWall = function (bool) {
 			isWall = bool;

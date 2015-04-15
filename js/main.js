@@ -1,6 +1,6 @@
 window.onload = function () {
 	// The functionality to be run when the when the page is loaded. 
-	var game = new MazeGame(30, 40);
+	var game = new MazeGame(12, 20);
 	game.render();
 	game.listen(window);
 }
@@ -167,6 +167,7 @@ function Maze (r, c) {
 			isWall = bool;
 		}
 
+		// Returns whether this maze tile is a candidate to become a new path tile
 		this.validPath = function () {
 			var n = self.north();
 			var e = self.east();
@@ -279,25 +280,6 @@ function Coordinate (r, c) {
 		return column;
 	}
 
-	this.getCol = function () {
-		return self.getColumn();
-	}
-
-	this.getX = function () {
-		return self.getColumn();
-	}
-
-	this.getY = function () {
-		return self.getRow();
-	}
-
-	this.r = function () {
-		return self.getRow();
-	}
-
-	this.c = function () {
-		return self.getColumn();
-	}
 }
 
 function Tile () {

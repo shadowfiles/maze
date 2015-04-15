@@ -1,20 +1,22 @@
 window.onload = function () {
 	// The functionality to be run when the when the page is loaded. 
-	var game = new MazeGame(12, 20);
+	var seed = Math.floor(Math.random() * 10000000) + 1111111;
+	var game = new MazeGame(seed, 12, 20);
 	game.render();
 	game.listen(window);
 }
 
-function MazeGame (r, c) {
+function MazeGame (s, r, c) {
+	var seed = s;
 	var self = this;
 	var container = document.getElementById("maze");
-	var maze = new Maze(r, c);
+	var maze = new Maze(s, r, c);
 	maze.generate();
 
 	var player = maze.getStart();
 
-	var squareWidth = (100 / c) + "%";
-	var squareHeight = (100 / r) + "%";
+	var squareWidth = Math.floor((100 / c) * 100) / 100 + "%";
+	var squareHeight = Math.floor((100 / r) * 100) / 100 + "%";
 
 	this.listen = function (cont) {
 		cont.onkeydown = function (e) {
@@ -56,7 +58,14 @@ function MazeGame (r, c) {
 	}
 
 	this.moveEast = function () {
-		self.move(player.east());
+		if (player.bordersEast() && player.isDoor()) {
+			maze = maze.eastMaze();
+			maze.generate();
+			player = maze.getLeftDoor();
+			self.render();
+		} else {
+			self.move(player.east());
+		}
 	}
 
 	this.moveSouth = function () {
@@ -64,7 +73,14 @@ function MazeGame (r, c) {
 	}
 
 	this.moveWest = function () {
-		self.move(player.west());
+		if (player.bordersWest() && player.isDoor()) {
+			maze = maze.westMaze();
+			maze.generate();
+			player = maze.getRightDoor();
+			self.render();
+		} else {
+			self.move(player.west());
+		}
 	}
 
 	this.render = function () {
@@ -92,12 +108,13 @@ function MazeGame (r, c) {
 	}
 }
 
-function Maze (r, c) {
+function Maze (s, r, c) {
 	var self = this;
 	var rows = r;
 	var columns = c;
 	var map = [];
-	var start;
+	var start, leftDoor, rightDoor;
+	var seed = s;
 
 	// Initialize a map
 	for (var i = 0; i < r; i++) {
@@ -106,6 +123,15 @@ function Maze (r, c) {
 			map[i][j] = new MazeTile(i, j);
 		}
 	}
+
+	this.westMaze = function () {
+		return new Maze(seed + 1, rows, columns);
+	}
+
+	this.eastMaze = function () {
+		return new Maze(seed - 1, rows, columns);
+	}
+
 
 	this.rows = function () {
 		return rows;
@@ -116,22 +142,50 @@ function Maze (r, c) {
 	}
 
 	this.generate = function () {
-		start = randomTile();
+		start = randomTile(seed);
 		var stack = [start];
+		var eastPaths = [];
+		var westPaths = [];
+		var count = 0;
 		while (stack.length != 0) {
 			var current = stack.pop();
 			if (current.validPath()) {
 				current.setWall(false);
+				if (current.bordersWest()) {
+					westPaths.push(current);
+				} else if (current.bordersEast()) {
+					eastPaths.push(current);
+				}
 				var neighbors = [current.north(), current.east(), 
 						current.south(), current.west()];
-				neighbors = shuffle(neighbors);
+				neighbors = shuffle(seed + 5 * count, neighbors);
 				for (var i = 0; i < neighbors.length; i++) {
 					if (neighbors[i] != null && neighbors[i].isWall()) {
 						stack.push(neighbors[i]);
 					}
 				}
+				count++;
 			}
 		}
+
+		if (westPaths.length > 0) {
+			leftDoor = seedChoice(seed + 6, westPaths).west();
+			leftDoor.setWall(false);
+			leftDoor.setDoor(true);
+		}
+		if (eastPaths.length > 0) {
+			rightDoor = seedChoice(seed + 9, eastPaths).east();
+			rightDoor.setWall(false);
+			rightDoor.setDoor(true);
+		}
+	}
+
+	this.getLeftDoor = function () {
+		return leftDoor;
+	}
+
+	this.getRightDoor = function () {
+		return rightDoor;
 	}
 
 	this.getStart = function () {
@@ -146,18 +200,26 @@ function Maze (r, c) {
 			return map[r][c];
 	}
 
-	function randomTile () {
-		var r = randomInt(0, rows);
-		var c = randomInt(0, columns);
+	function randomTile (s) {
+		var r = randomInt(s + 2, rows - 2, 1);
+		var c = randomInt(s + 4, columns - 2, 1);
 		return self.getTile(r, c);
 	}
 
 	function MazeTile (r, c) {
 		var row = r;
 		var column = c;
-		var tile = new Tile();
 		var isWall = true;
 		var self = this;
+		var isDoor = false; 
+
+		this.isDoor = function () {
+			return isDoor;
+		}
+
+		this.setDoor = function (b) {
+			isDoor = b;
+		}
 
 		this.getId = function () {
 			return row + "-" + column;
@@ -165,6 +227,14 @@ function Maze (r, c) {
 
 		this.setWall = function (bool) {
 			isWall = bool;
+		}
+
+		this.bordersWest = function () {
+			return column <= 1;
+		}
+
+		this.bordersEast = function () {
+			return column >= columns - 2;
 		}
 
 		// Returns whether this maze tile is a candidate to become a new path tile
@@ -181,6 +251,11 @@ function Maze (r, c) {
 			if (w != null && !w.isWall()) pathCount++;
 
 			if (pathCount > 1) return false;
+
+			if (self.north() === null || self.south() === null 
+					|| self.east() === null || self.west() === null) {
+				return false;
+			}
 
 			if (validRow(row - 1) && validColumn(column + 1)) {
 				// Check if northeast makes a 4-block
@@ -258,11 +333,11 @@ function Maze (r, c) {
 		}
 
 		function validRow (i) {
-			return i < rows && i >= 0;
+			return i <= rows - 1 && i >= 0;
 		}
 
 		function validColumn (i) {
-			return i < columns && i >= 0;
+			return i <= columns - 1 && i >= 0;
 		}
 	}
 }
@@ -282,13 +357,10 @@ function Coordinate (r, c) {
 
 }
 
-function Tile () {
-
-}
-
-function shuffle (arr) {
+function shuffle (seed, arr) {
 	for (var i = arr.length - 1; i > 0; i--) {
-		var j = randomInt(0, i + 1);
+		seed += 5;
+		var j = randomInt(seed, i + 1, 0);
 		var temp = arr[i];
 		arr[i] = arr[j];
 		arr[j] = temp;
@@ -300,6 +372,16 @@ function xor (a, b) {
 	return !((a && b) || (!a && !b));
 }
 
-function randomInt (min, max) {
-	return Math.floor(Math.random() * (max - min)) + min;
+function random (seed) {
+    var x = Math.sin(seed) * 10000;
+    return x - Math.floor(x);
+}
+
+function randomInt (seed, max, min) {
+    if (!min) min = 0;
+    return min + Math.floor(random(seed) * (max - min));
+}
+
+function seedChoice (seed, choices) {
+    return choices[Math.floor(random(seed) * choices.length)];
 }
